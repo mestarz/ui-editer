@@ -1,7 +1,10 @@
 # ui-editer
 
-> 给 [BaiSiYeShou](https://github.com/mestarz/BaiSiYeShou) 配套的 UI 迭代加速工具集。
-> 两个**互相独立**的子项目，都以 `--game-root` 指向主仓库，**只读消费**，不写回源码。
+> 面向 **TapTap 小游戏引擎（NanoVG + Lua）** + 采用 [BaiSiYeShou](https://github.com/mestarz/BaiSiYeShou) 同款架构（`scripts/scenes/Registry.lua` 表驱动场景 + `SceneManager` / `GameFlow` 入口）的项目，配套的 UI 迭代加速工具集。
+>
+> 两个**互相独立**的子项目，都以 `--game-root` 指向目标项目根，**只读消费**，不写回源码。
+>
+> ⚠️ 不是通用 Lua/UI 工具：依赖具体的引擎 API（`Renderer.FillRect/PixelPanel/DrawImage/...`、`nvgImagePattern` 等）与场景注册约定。要在其他项目复用，需按 [兼容清单](#兼容清单) 适配。
 
 ## 子项目
 
@@ -62,3 +65,15 @@ ui-editer/
 - 不做手机端预览（PC only）
 - web_layout 不跑 Update/Input，只跑 Draw 一帧
 - 两子项目不共享代码
+
+## 兼容清单
+
+复用到其他项目时，目标项目需满足：
+
+1. **引擎**：TapTap 小游戏（NanoVG + Lua 5.x），全局存在 `nvg*`、`graphics`、`input`、`fileSystem` 等 API
+2. **入口**：`scripts/main.lua` 提供 `Start()` 函数；逐帧调用走 `SceneManager.Draw`
+3. **场景注册**：`scripts/scenes/Registry.lua` 形如 `{ id = "...", module = "...", phase = "..." }` 的声明式表
+4. **跨场景跳转**：通过 `GameFlow.Enter*(...)` 入口（web_layout 服务端会调用）
+5. **绘制 API**：常用 `Renderer.FillRect/StrokeRect/FillRounded/PixelPanel/HPBar/DrawImage/TextLeft/TextCenter/TextRight/FillCircle/Line` —— 不在这个清单里的自定义绘制 API 需要在 `web_layout/server/recorder/boot.lua` 的 `patch_renderer` 中追加 wrap
+
+不满足以上前提的项目，可参考本仓库实现思路自己改造，但本仓库不保证开箱即用。
