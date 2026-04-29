@@ -1,0 +1,22 @@
+# 顶层忽略
+.DS_Store
+*.swp
+*.log
+.idea/
+.vscode/
+
+# Node
+node_modules/
+dist/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# 编辑器导出物
+exports/
+
+# 进程 PID（run.sh -s 用）
+*.pid

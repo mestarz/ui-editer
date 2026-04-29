@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BaiSiYeShou — Web Layout Editor</title>
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <aside id="sidebar">
+      <h2>场景</h2>
+      <ul id="scene-list"></ul>
+      <div class="hint">点击场景：录制 UI 元素树</div>
+      <h2>选中元素</h2>
+      <div id="selection-info">（未选中）</div>
+      <h2>操作</h2>
+      <button id="btn-reload" class="primary">🔄 重载 Lua（源码改了点这个）</button>
+      <button id="btn-deselect">取消选择 (Esc)</button>
+      <button id="btn-reset">重置该元素 (R)</button>
+      <button id="btn-reset-all">重置全部</button>
+      <button id="btn-export">📋 复制 overrides+report 到剪贴板</button>
+      <h2>统计</h2>
+      <div id="stats">未加载</div>
+    </aside>
+    <main id="canvas-wrap">
+      <div id="canvas-frame">
+        <div id="canvas"></div>
+      </div>
+      <div id="status-bar">就绪。Shift = 多选；拖拽边缘 = 缩放；Esc 取消；R 重置。</div>
+    </main>
+    <aside id="tree-panel">
+      <h2>UI 树</h2>
+      <div class="tree-toolbar">
+        <input id="tree-filter" type="text" placeholder="过滤：api / hint / src" />
+        <label><input type="checkbox" id="tree-only-modified" /> 仅显示已修改</label>
+      </div>
+      <div id="tree-list"></div>
+    </aside>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
