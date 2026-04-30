@@ -10,6 +10,12 @@
 #   ./run.sh --status                        查看进程状态
 #
 # 其余参数会原样透传给 run.py
+#
+# ── 窗口缩放配置 ──────────────────────────────────────
+# WINDOW_SCALE: 物理窗口相对于 1280x720 设计画布的放大倍数。
+#   "auto"   根据屏幕宽度自动选择：≥3840(4K)→2.0  ≥2560(QHD)→1.5  其余→1.0
+#   数字     如 "1.0" "1.5" "2.0"，固定使用该倍数
+WINDOW_SCALE="auto"
 set -euo pipefail
 
 cd "$(dirname "$0")"
@@ -50,6 +56,29 @@ ensure_venv() {
   fi
 }
 
+# ---- 分辨率检测 ----
+detect_screen_width() {
+  if command -v xrandr &>/dev/null; then
+    xrandr 2>/dev/null | awk '/^Screen 0/{print $8; exit}'
+  fi
+}
+
+resolve_window_scale() {
+  local setting="$1"
+  if [[ "$setting" == "auto" ]]; then
+    local w; w=$(detect_screen_width)
+    if [[ "${w:-0}" -ge 3840 ]]; then
+      echo "2.0"
+    elif [[ "${w:-0}" -ge 2560 ]]; then
+      echo "1.5"
+    else
+      echo "1.0"
+    fi
+  else
+    echo "$setting"
+  fi
+}
+
 # ---- 参数解析 ----
 GAME_ROOT_ARG=""
 ACTION="start"
@@ -81,13 +110,16 @@ GAME_ROOT="$(cd "$GAME_ROOT" && pwd)"
 ensure_venv
 echo "[run] GAME_ROOT=$GAME_ROOT"
 
+RESOLVED_SCALE=$(resolve_window_scale "$WINDOW_SCALE")
+echo "[run] WINDOW_SCALE=$RESOLVED_SCALE (config='$WINDOW_SCALE')"
+
 if [[ "$BG" == "1" ]]; then
   cmd_stop
-  nohup "$VENV/bin/python" run.py --game-root "$GAME_ROOT" "${PASSTHROUGH[@]}" \
+  nohup "$VENV/bin/python" run.py --game-root "$GAME_ROOT" --window-scale "$RESOLVED_SCALE" "${PASSTHROUGH[@]}" \
     > "$LOG_FILE" 2>&1 &
   echo $! > "$PID_FILE"
   echo "[run] preview pid=$(cat "$PID_FILE") log=$LOG_FILE"
   echo "[run] stop with: ./run.sh -s"
 else
-  exec "$VENV/bin/python" run.py --game-root "$GAME_ROOT" "${PASSTHROUGH[@]}"
+  exec "$VENV/bin/python" run.py --game-root "$GAME_ROOT" --window-scale "$RESOLVED_SCALE" "${PASSTHROUGH[@]}"
 fi

@@ -4,9 +4,56 @@
   路径解析根目录由 run.py 设置（默认 BaiSiYeShou/assets，对齐引擎工作目录）。
 · FontLoader：管理 nvgCreateFont 注册的 (name, ttf 路径)，按需 + 按字号缓存。
 """
+import glob as _glob
 import os
+import subprocess
 from typing import Dict, Optional, Tuple
 import pygame
+
+
+def _find_cjk_font() -> str:
+    """在系统中查找一个支持 CJK 的字体文件路径，找不到返回空字符串。"""
+    candidates = [
+        # Arch Linux
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Light.ttc",
+        "/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc",
+        # Ubuntu / Debian
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansSC-Regular.otf",
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+        # WSL — Windows 字体目录
+        "/mnt/c/Windows/Fonts/msyh.ttc",          # 微软雅黑
+        "/mnt/c/Windows/Fonts/NotoSansSC-VF.ttf", # Noto Sans SC（若安装）
+        "/mnt/c/Windows/Fonts/simsun.ttc",         # 宋体
+        "/mnt/c/Windows/Fonts/simhei.ttf",         # 黑体
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    # 通配查找 Noto CJK 变体
+    for pattern in (
+        "/usr/share/fonts/**/NotoSansCJK*.ttc",
+        "/usr/share/fonts/**/NotoSansSC*.otf",
+        "/mnt/c/Windows/Fonts/Noto*CJK*.ttc",
+    ):
+        found = sorted(_glob.glob(pattern, recursive=True))
+        if found:
+            return found[0]
+    # 最后用 fc-match 动态查找（排除不含 CJK 的 DejaVu 等回退字体）
+    try:
+        result = subprocess.run(
+            ["fc-match", "--format=%{file}", ":lang=zh:spacing=proportional"],
+            capture_output=True, text=True, timeout=2,
+        )
+        if result.returncode == 0:
+            p = result.stdout.strip()
+            _non_cjk = ("DejaVu", "FreeSans", "Liberation", "Nimbus")
+            if p and os.path.exists(p) and not any(x in p for x in _non_cjk):
+                return p
+    except Exception:
+        pass
+    return ""
 
 
 class AssetLoader:
@@ -70,17 +117,13 @@ class FontLoader:
             if os.path.exists(cand):
                 self._registered[name] = cand
                 return 1
-        # 找不到 ttf 时降级查找系统 CJK 字体（保证中文不变方框）
-        for sys_cand in (
-            "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
-            "/usr/share/fonts/noto-cjk/NotoSansCJK-Light.ttc",
-            "/usr/share/fonts/wenquanyi/wqy-zenhei/wqy-zenhei.ttc",
-        ):
-            if os.path.exists(sys_cand):
-                self._registered[name] = sys_cand
-                print(f"[FontLoader] {rel_path} 不存在，降级使用 {sys_cand}")
-                return 1
-        print(f"[FontLoader] 未找到字体 {rel_path}，将使用系统默认")
+        # 找不到游戏内字体时，降级查找系统 CJK 字体（保证中文不变方框）
+        sys_cand = _find_cjk_font()
+        if sys_cand:
+            self._registered[name] = sys_cand
+            print(f"[FontLoader] {rel_path} 不存在，降级使用 {sys_cand}")
+            return 1
+        print(f"[FontLoader] 未找到字体 {rel_path}，将使用 pygame 内置默认字体（CJK 可能无法显示）")
         self._registered[name] = ""
         return 1
 
