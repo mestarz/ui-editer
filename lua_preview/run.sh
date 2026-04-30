@@ -139,6 +139,29 @@ echo "[run] GAME_ROOT=$GAME_ROOT"
 RESOLVED_SCALE=$(resolve_window_scale "$WINDOW_SCALE")
 echo "[run] WINDOW_SCALE=$RESOLVED_SCALE (config='$WINDOW_SCALE')"
 
+# ---- SDL / GL 兼容性环境（用户已显式设置则保持原值） ----
+# 仅对原生 Linux（Arch/Fedora/Ubuntu 等）介入；WSL/WSLg 走它默认的 X11+GLX
+# 路径，因为 OSMesa 后端不会与 SDL 的 GL state 冲突，无需特殊化。
+_is_wsl=0
+if [[ -n "${WSL_DISTRO_NAME:-}" ]] || grep -qiE '(microsoft|wsl)' /proc/sys/kernel/osrelease 2>/dev/null; then
+    _is_wsl=1
+fi
+if [[ "$_is_wsl" == "0" ]]; then
+    if [[ -z "${SDL_VIDEODRIVER:-}" ]]; then
+        if [[ -n "${WAYLAND_DISPLAY:-}" ]]; then
+            # Wayland 桌面：直接走 wayland driver，绕开 X11/GLX 整条路
+            # （Arch + NVIDIA 上 SDL 走 X11/GLX 会报 X_GLXCreateContext BadValue）
+            export SDL_VIDEODRIVER=wayland
+        elif [[ -z "${DISPLAY:-}" ]]; then
+            # 没显示（CI / 纯快照）退到 dummy 驱动
+            export SDL_VIDEODRIVER=dummy
+        fi
+    fi
+    # X11 路径下让 SDL 用 EGL 而非 GLX
+    export SDL_VIDEO_X11_FORCE_EGL="${SDL_VIDEO_X11_FORCE_EGL:-1}"
+fi
+echo "[run] WSL=$_is_wsl  SDL_VIDEODRIVER=${SDL_VIDEODRIVER:-<auto>}  SDL_VIDEO_X11_FORCE_EGL=${SDL_VIDEO_X11_FORCE_EGL:-<auto>}"
+
 if [[ "$BG" == "1" ]]; then
     cmd_stop
     nohup "$VENV/bin/python" run.py --game-root "$GAME_ROOT" --window-scale "$RESOLVED_SCALE" "${PASSTHROUGH[@]}" \
