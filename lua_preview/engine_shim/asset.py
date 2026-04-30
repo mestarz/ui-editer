@@ -19,9 +19,19 @@ def _is_wsl() -> bool:
         return False
 
 
+def _bundled_font() -> str:
+    """优先使用 lua_preview/assets/fonts/MiSans-Regular.ttf（与项目一起分发）。"""
+    here = os.path.dirname(os.path.abspath(__file__))
+    p = os.path.normpath(os.path.join(here, "..", "assets", "fonts", "MiSans-Regular.ttf"))
+    return p if os.path.exists(p) else ""
+
+
 def _find_cjk_font() -> str:
     """在系统中查找一个支持 CJK 的字体文件路径，找不到返回空字符串。
-    WSL 环境下优先使用 Windows 微软雅黑（msyh.ttc）。"""
+    优先级：lua_preview 自带 MiSans → 系统/Windows 字体 → fc-match。"""
+    bundled = _bundled_font()
+    if bundled:
+        return bundled
     wsl_candidates = [
         "/mnt/c/Windows/Fonts/msyh.ttc",          # 微软雅黑（优先）
         "/mnt/c/Windows/Fonts/NotoSansSC-VF.ttf", # Noto Sans SC

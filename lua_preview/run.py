@@ -9,6 +9,18 @@ import sys
 import time
 import traceback
 
+# 在 import pygame 之前预加载系统 libstdc++.so.6，避免某些 Python 发行版
+# （如 conda）自带较旧版本时，dlopen libnvgrender.so 报 GLIBCXX_3.4.30 未找到。
+for _so in ("/lib/x86_64-linux-gnu/libstdc++.so.6",
+            "/usr/lib/x86_64-linux-gnu/libstdc++.so.6"):
+    if os.path.exists(_so):
+        try:
+            import ctypes
+            ctypes.CDLL(_so, mode=ctypes.RTLD_GLOBAL)
+        except OSError:
+            pass
+        break
+
 import pygame
 import lupa
 
@@ -68,6 +80,25 @@ def main():
 
     # NVG 上下文（绑定到 screen）
     vg_handle = nvg.nvg_create_context(screen, asset_loader, font_loader)
+
+    # 让 native 后端立刻拿到 "sans" 字体（含系统 CJK 降级），覆盖 overlay 与
+    # 早期 Lua 调用 nvgFontFace("sans") 但没先 nvgCreateFont 的情况。
+    try:
+        sans_path = font_loader._registered.get("sans", "")
+        if sans_path and os.path.exists(sans_path):
+            nvg.nvgCreateFont(vg_handle, "sans", sans_path)
+        # 符号 / emoji 回退链：sans → symbols2 → emoji
+        bundled_fonts = os.path.join(os.path.dirname(__file__), "assets", "fonts")
+        sym2 = os.path.join(bundled_fonts, "NotoSansSymbols2-Regular.ttf")
+        if os.path.exists(sym2):
+            if nvg.nvgCreateFont(vg_handle, "symbols2", sym2) >= 0:
+                nvg.nvgAddFallbackFont(vg_handle, "sans", "symbols2")
+        emoji = os.path.join(bundled_fonts, "OpenMoji-Black.ttf")
+        if os.path.exists(emoji):
+            if nvg.nvgCreateFont(vg_handle, "emoji", emoji) >= 0:
+                nvg.nvgAddFallbackFont(vg_handle, "sans", "emoji")
+    except Exception as _e:
+        print("[run] 预注册 sans 字体到 native 失败:", _e)
 
     # 把所有 shim 装进 Lua 全局
     constants.install(lua)

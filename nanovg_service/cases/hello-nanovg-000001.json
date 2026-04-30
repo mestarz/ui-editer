@@ -1,0 +1,9 @@
+{
+  "name": "Hello NanoVG",
+  "width": 512,
+  "height": 384,
+  "dpr": 1,
+  "tags": ["example"],
+  "createdAt": "2026-04-30T11:30:00.000Z",
+  "updatedAt": "2026-04-30T11:30:00.000Z"
+}
