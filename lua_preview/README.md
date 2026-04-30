@@ -9,14 +9,23 @@ cd ui-editer/lua_preview
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
-# 渲染走真实 nanovg + OSMesa（与 TapTap 真机渲染一致），需要构建一次 librender.so：
+# 渲染走真实 nanovg + headless OpenGL（与 TapTap 真机渲染一致），按系统二选一构建：
+# (a) Debian/Ubuntu/WSL：经典 OSMesa 后端
 sudo apt install -y libosmesa6-dev
 (cd librender && ./build.sh)
+# (b) Arch / Fedora / Mesa 26+：EGL 后端（mesa 已不再打包 OSMesa）
+sudo pacman -S --needed mesa            # Arch；提供 libEGL/libGL
+(cd librender_egl && ./build.sh)
 ```
+
+> 两个子项目产物都叫 `libnvgrender.so`，ABI 完全一致。`engine_shim/nvg.py` 会优先加载 `librender_egl/build/libnvgrender.so`，找不到再回退到 `librender/build/libnvgrender.so`，所以两个目录里只要有一个被构建过即可；也可以用 `LUA_PREVIEW_LIBRENDER=/path/to/libnvgrender.so` 显式指定。
+>
+> librender_egl 通过 EGL device-platform 或 `EGL_PLATFORM_SURFACELESS_MESA` 打开**与宿主进程隔离**的 EGL display，再用 FBO+`glReadPixels` 把像素回读给 Python，避免与 SDL2/pygame 自己的 EGL state 互踢。
+
 
 > 注：必须用 **pygame-ce**（已在 requirements.txt 中），原版 pygame 在 Python 3.14 上有 font 模块循环导入 bug。
 >
-> librender 源码在 `librender/`，依赖只有 OSMesa；vendored 了 nanovg/stb 上游源码，无外部 git 子模块。
+> librender 源码在 `librender/`（OSMesa 后端，Debian/WSL）和 `librender_egl/`（EGL 后端，Arch/Mesa 26+）；两者共享 `librender/third_party/{nanovg,stb}` 上游源码，无外部 git 子模块。
 >
 > 中文字体：`assets/fonts/MiSans-Regular.ttf` 已随项目分发（小米开源字体，~7.6MB）。当 BaiSiYeShou 工程没有 `Fonts/MiSans-Regular.ttf` 时自动回退到这份，确保 CJK 不显示成方块。
 >

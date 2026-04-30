@@ -131,7 +131,14 @@ _ffi.cdef(
 
 def _load_lib() -> Any:
     here = pathlib.Path(__file__).resolve().parent
+    # Search order:
+    #   1. $LUA_PREVIEW_LIBRENDER (explicit override).
+    #   2. librender_egl  -- EGL/device-platform build (Mesa 26+, Arch/Fedora).
+    #   3. librender      -- OSMesa build (WSL/Debian/older distros).
+    # Whichever is built locally wins; missing trees are skipped silently.
     candidates = [
+        here.parent / "librender_egl" / "build" / "libnvgrender.so",
+        here.parent / "librender_egl" / "libnvgrender.so",
         here.parent / "librender" / "build" / "libnvgrender.so",
         here.parent / "librender" / "libnvgrender.so",
     ]
@@ -156,7 +163,9 @@ def _load_lib() -> Any:
         if p.exists():
             return _ffi.dlopen(str(p))
     raise FileNotFoundError(
-        f"libnvgrender.so not found. Build it: cd {here.parent}/librender && ./build.sh"
+        "libnvgrender.so not found. Build one of:\n"
+        f"  - {here.parent}/librender_egl   (Arch/Fedora/Mesa 26+, EGL backend) -- ./build.sh\n"
+        f"  - {here.parent}/librender       (WSL/Debian, OSMesa backend)        -- ./build.sh"
     )
 
 
