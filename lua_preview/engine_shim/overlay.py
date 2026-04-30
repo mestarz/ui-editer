@@ -28,9 +28,13 @@ class Overlay:
         self.current_scene = "?"
         self._rects: List[tuple] = []  # [(rect, scene_id), ...]
         self.mouse_pos = (0, 0)  # 设计画布坐标（外部每帧更新）
+        self.scroll = 0       # 当前滚动偏移（像素）
+        self._max_scroll = 0  # 最大可滚动量（每帧 draw 时更新）
 
     def toggle(self):
         self.visible = not self.visible
+        if not self.visible:
+            self.scroll = 0  # 关闭时重置滚动位置
 
     def set_fps(self, fps: float):
         self.fps = fps
@@ -50,6 +54,9 @@ class Overlay:
                 if rect.collidepoint(ev.pos):
                     self.on_pick(sid)
                     return True
+        if ev.type == pygame.MOUSEWHEEL:
+            self.scroll = max(0, min(self._max_scroll, self.scroll - ev.y * 20))
+            return True
         return False
 
     def draw(self, surf: pygame.Surface):
@@ -83,25 +90,44 @@ class Overlay:
         title = self.font.render("Scenes", True, (240, 240, 240))
         surf.blit(title, (px + 12, py + 8))
 
-        # 列出
+        # 内容可见区域
+        content_top = py + 44
+        content_bot = py + panel_h - 6
+
+        # 计算虚拟内容总高度，更新最大滚动量
+        total_h = sum(22 + len(items) * 22 + 6 for items in self.groups.values())
+        self._max_scroll = max(0, total_h - (content_bot - content_top))
+
+        # 按虚拟 y 绘制条目，只绘制在可见区域内的部分
         self._rects = []
         mx, my = self.mouse_pos
-        y = py + 44
+        virtual_y = 0  # 相对于 content_top 的虚拟位置（不含滚动）
         for phase, items in self.groups.items():
-            ph = self.small.render(f"[{phase}]", True, (140, 180, 255))
-            surf.blit(ph, (px + 12, y))
-            y += 22
+            vy = content_top + virtual_y - self.scroll
+            if content_top <= vy < content_bot:
+                ph = self.small.render(f"[{phase}]", True, (140, 180, 255))
+                surf.blit(ph, (px + 12, vy))
+            virtual_y += 22
             for it in items:
                 sid = it["id"]
-                rect = pygame.Rect(px + 24, y, panel_w - 36, 22)
-                hovered = rect.collidepoint(mx, my)
-                if hovered:
-                    pygame.draw.rect(surf, (60, 90, 150, 200), rect)
-                color = (255, 255, 180) if sid == self.current_scene else (220, 220, 220)
-                lbl = self.small.render(sid, True, color)
-                surf.blit(lbl, (rect.x + 6, rect.y + 4))
-                self._rects.append((rect, sid))
-                y += 22
-                if y > py + panel_h - 24:
-                    return
-            y += 6
+                vy = content_top + virtual_y - self.scroll
+                if content_top <= vy < content_bot:
+                    rect = pygame.Rect(px + 24, vy, panel_w - 36, 22)
+                    hovered = rect.collidepoint(mx, my)
+                    if hovered:
+                        pygame.draw.rect(surf, (60, 90, 150, 200), rect)
+                    color = (255, 255, 180) if sid == self.current_scene else (220, 220, 220)
+                    lbl = self.small.render(sid, True, color)
+                    surf.blit(lbl, (rect.x + 6, rect.y + 4))
+                    self._rects.append((rect, sid))
+                virtual_y += 22
+            virtual_y += 6
+
+        # 滚动条（有溢出内容时才绘制）
+        if self._max_scroll > 0:
+            bar_x = px + panel_w - 7
+            bar_h = content_bot - content_top
+            thumb_h = max(20, int(bar_h * bar_h / total_h))
+            thumb_y = content_top + int((bar_h - thumb_h) * self.scroll / self._max_scroll)
+            pygame.draw.rect(surf, (50, 60, 90), pygame.Rect(bar_x, content_top, 5, bar_h))
+            pygame.draw.rect(surf, (130, 155, 215), pygame.Rect(bar_x, thumb_y, 5, thumb_h))

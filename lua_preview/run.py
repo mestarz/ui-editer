@@ -251,6 +251,8 @@ def _enter_scene(lua, scene_id: str):
         "defense":      'GF.EnterDefense()',
         "title":        'GF.EnterTitle()',
         "gallery":      'GF.EnterGallery()',
+        "gameover":     'GF.EnterGameOver()',
+        "result":       'GF.EnterResult()',
     }
     snippet_lines.append(enter_map.get(scene_id, f'SM.GoTo("{scene_id}")'))
     code = "\n".join(snippet_lines)
