@@ -69,3 +69,39 @@ sudo pacman -S --needed mesa            # Arch；提供 libEGL/libGL
 - 复杂 2D 变换（仅平移 + 均匀缩放）
 
 UI、场景渲染、字体、图片、输入、事件、AssetLoader 全部 1:1。
+
+## 故障排查（Troubleshooting）
+
+### 启动报 `libnvgrender.so not found`
+两个后端都没构建。按上面"安装"二选一构建即可。也可以通过环境变量直接指定：
+```bash
+LUA_PREVIEW_LIBRENDER=/abs/path/to/libnvgrender.so ./run.sh
+```
+
+### Arch / Wayland + NVIDIA：`X_GLXCreateContext BadValue`
+SDL 默认走 X11/GLX，遇到 NVIDIA 私有驱动会失败。`run.sh` 在原生 Linux 上检测到 `WAYLAND_DISPLAY` 会自动切 `SDL_VIDEODRIVER=wayland`；如被覆盖可手动：
+```bash
+SDL_VIDEODRIVER=wayland ./run.sh
+# 或退到软件渲染窗口
+SDL_VIDEODRIVER=x11 SDL_VIDEO_X11_FORCE_EGL=1 ./run.sh
+```
+
+### Arch：窗口黑屏 / 标题画面像素错乱
+通常意味着 `librender_egl` 抢走了 SDL 自己的 EGL current context、或者纹理上传到了错误的 GL context。请确认用的是最新版（`begin/end_frame`、`create/update/delete_image` 等入口都做了 EGL state save/restore）：
+```bash
+cd librender_egl && rm -rf build && ./build.sh
+```
+
+### 想强制走某一后端
+```bash
+LUA_PREVIEW_LIBRENDER=$PWD/librender/build/libnvgrender.so      ./run.sh   # 强制 OSMesa
+LUA_PREVIEW_LIBRENDER=$PWD/librender_egl/build/libnvgrender.so  ./run.sh   # 强制 EGL
+```
+
+### 离屏快照（无需任何窗口/显示）
+```bash
+SDL_VIDEODRIVER=dummy ./.venv/bin/python run.py --snapshot out.png --snapshot-frames 30
+```
+
+### libEGL warnings：`pci id for fd N: …, driver (null)` / `failed to create dri2 screen`
+NVIDIA 私有驱动没装 EGL 部分时 Mesa 26 会先尝试 GBM/DRI2 失败再退到 llvmpipe。是噪音，不影响渲染（最终软件路径成功）。要消音可装 NVIDIA EGL 包（如 Arch 的 `nvidia-utils` 提供 `libnvidia-egl-*`）。
