@@ -11,9 +11,24 @@ from typing import Dict, Optional, Tuple
 import pygame
 
 
+def _is_wsl() -> bool:
+    try:
+        with open("/proc/version", "r") as f:
+            return "microsoft" in f.read().lower()
+    except Exception:
+        return False
+
+
 def _find_cjk_font() -> str:
-    """在系统中查找一个支持 CJK 的字体文件路径，找不到返回空字符串。"""
-    candidates = [
+    """在系统中查找一个支持 CJK 的字体文件路径，找不到返回空字符串。
+    WSL 环境下优先使用 Windows 微软雅黑（msyh.ttc）。"""
+    wsl_candidates = [
+        "/mnt/c/Windows/Fonts/msyh.ttc",          # 微软雅黑（优先）
+        "/mnt/c/Windows/Fonts/NotoSansSC-VF.ttf", # Noto Sans SC
+        "/mnt/c/Windows/Fonts/simsun.ttc",         # 宋体
+        "/mnt/c/Windows/Fonts/simhei.ttf",         # 黑体
+    ]
+    linux_candidates = [
         # Arch Linux
         "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/noto-cjk/NotoSansCJK-Light.ttc",
@@ -22,12 +37,8 @@ def _find_cjk_font() -> str:
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansSC-Regular.otf",
         "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
-        # WSL — Windows 字体目录
-        "/mnt/c/Windows/Fonts/msyh.ttc",          # 微软雅黑
-        "/mnt/c/Windows/Fonts/NotoSansSC-VF.ttf", # Noto Sans SC（若安装）
-        "/mnt/c/Windows/Fonts/simsun.ttc",         # 宋体
-        "/mnt/c/Windows/Fonts/simhei.ttf",         # 黑体
     ]
+    candidates = (wsl_candidates + linux_candidates) if _is_wsl() else (linux_candidates + wsl_candidates)
     for p in candidates:
         if os.path.exists(p):
             return p
